@@ -1,0 +1,144 @@
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+def CMO(gen_in, gen_out, flag):
+    # Списки для хранения теор-го и практ-го среднего времени нахождения в СМО
+    teor_time = list()
+    prac_time = list()
+    QsT = []
+    Qs = []
+
+    # Цикл смены множителей для входного потока
+    for factor in np.arange(0.1, 1, 0.1):
+        mu0 = 1
+        l_old = 999
+        n_old = 999
+        N = 1000
+        Nb = 5 #объем буфера
+        Not = 0#количество отказов
+    
+         # Цикл для определения количества запросов дост-х для имитации СМО(3 работа)
+        while True:
+            sample = list()
+            for i in range(N):
+                sample.append(eval(gen_in))
+            # Мат ожидание на текущем объеме выборки
+            mu = sum(sample) / N
+            # Стандартное отклонение на текущем объеме
+            sgm = math.sqrt(1 / (N - 1) * sum(map(lambda x: (x - mu) ** 2, sample)))
+            # Интенсивность потока на текущем объеме выборки
+            l_new = 1 / mu
+            # Коэффициент вариации потока на текущем объеме выборки
+            n_new = sgm / mu
+            # Запись данных, полученных на текущем шаге
+            if math.fabs((l_new - l_old)/l_old) > 0.01 or math.fabs((n_new - n_old) / n_old) > 0.01:
+                # Если недостаточно точно, размер выборки увеличивается в 2 раза, а начальные лямбда и ню переопределяются
+                N =N*2
+                l_old, n_old = l_new, n_new
+            else:
+                # Если точность достаточна, то прерывается цикл
+                Nmax = N
+                break
+        # Начальные параметры СМО
+        zan = False
+        a = 1 / mu0 - 0.05 * mu0
+        b = 0.1 * mu0 + a
+        m, n, k, ts = 0, 0, 0, 0
+
+        ts_start = list()
+        ts_finish = list()
+        t_c = sample.pop()
+        t_o = t_c
+        # Пока не поступит заявок больше, чем мы получили в расчете
+        while len(sample):
+            # Пришла ли новая заявка раньше старой
+            if t_c <= t_o:  # Если пришла раньше
+                # Если да, то приравниваем время прибытия к системному времени
+                ts = t_c
+                # +1 поступивших заявок
+                n += 1
+                # Сохраняем время прибытия
+                ts_start.append(ts)
+                # Проверка занятости ОУ
+                if zan:  # Если ОУ занято
+                    if m < Nb:
+                    # Увеличиваем буфер
+                        m += 1
+                    else:
+                        del(ts_start[-1])
+                        Not+=1
+                else:  # Если ОУ свободно
+                    # Занимаем его
+                    zan = True
+                    # Генерируем время освобождения
+                    t_o = eval(gen_out)+ts
+                # Генерируем время прибытия новой заявки
+                t_c = sample.pop()+ts
+                
+            else:  # Если пришла позже
+                # Увеличиваем системное время на время выхода
+                ts = t_o
+                # Сохраняем время выхода заявки
+                ts_finish.append(ts)
+                # +1 обработанная заявка
+                k += 1
+                # Проверяем буфер
+                if m > 0: # Если не пуст
+                    # Берем заявку от туда(образно)
+                    m -= 1
+                    # Генерируем для неё время освобождения
+                    t_o = eval(gen_out)+ts
+                else: # Если буфер пуст
+                    # Освобождаем ОУ
+                    zan = False
+                    # Изеняем время выхода на время входа
+                    t_o = t_c
+        # Считаем коэф-т загруженности СМО
+        ro = factor
+        T = (1/(factor*mu0))*sum([(x*(ro**x)*(1-ro))/(1-ro**(Nb+1)) for x in range(0,Nb+2)])
+        Pot = ((1-ro)*ro**(Nb+1))/(1-ro**(Nb+2))
+        print(Pot)
+        Qt = (factor*mu0)*(1-Pot)
+        QsT.append(Qt)
+       
+        # Сохраняем результат
+        teor_time.append(T)
+        # Оценочное время нахождения каждой заявки
+        t_l = [ts_finish[i] - ts_start[i] for i in range(len(ts_finish))]
+        # Среднее время
+        prac = sum(t_l) / len(t_l)
+        # Сохраняем значение
+        prac_time.append(prac)
+        Q = (factor*mu0)*(1-(Not/Nmax))
+        Qs.append(Q)
+        # Вывод теоретического и практического значения
+        print("Среднее время нахождения при коэффициенте ", factor, ':')
+        if flag:
+            print("Теоритическое T:", T, end=' ')
+        print("Практическое T:", prac)
+        if flag:
+            print("Теоритическое Q:", Qt, end=' ')
+        print("Практическое Q:", Q)
+    fig = plt.figure()
+    axes = fig.add_subplot(111)
+    axes.grid(True)
+    if flag:
+        axes.plot([mu0 * x for x in np.arange(0.1, 1, 0.1)], teor_time, '-r')
+    axes.plot([mu0 * x for x in np.arange(0.1, 1, 0.1)], prac_time, '-k')
+    plt.show()
+    plt.plot([mu0 * x for x in np.arange(0.1, 1, 0.1)], Qs, '-k',linestyle='-')
+    if flag:
+        plt.plot([mu0 * x for x in np.arange(0.1, 1, 0.1)], QsT, '-r',linestyle='--')
+
+
+# Для тестовой СМО
+#print("Тестовая система:")
+#gen_in = "np.random.exponential(1 /(factor*mu0))"
+#gen_out = "np.random.exponential(1/mu0)"
+#CMO(gen_in, gen_out, True)
+print("Система варианта задания:")
+# Для СМО варианта
+gen_in = "sum(np.random.exponential(1 / (factor * mu0*2),2))"
+gen_out = "np.random.uniform(a, b)"
+CMO(gen_in, gen_out, False)
