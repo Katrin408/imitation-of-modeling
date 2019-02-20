@@ -1,0 +1,29 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+ass = np.zeros(15)
+raz = np.zeros(15)
+ist = [1.7196 for i in range (15)]
+
+def func(N):
+    el = np.random.uniform(0,3,N)
+    s=0
+    for i in range(N):
+        if (el[i]>0 and el[i]<1):
+            f = 1*(2/(el[i]+1))
+        elif (el[i]<=2) and (el[i]>=1):
+            f = -1*(2*(el[i]-1)-1)
+        else:
+            f=1*(4*(el[i]-2)**2-1)
+        s = s+f
+    rez = (3-0)/N*s
+    return(rez)
+
+for j in range(15):
+    ass[j] = func(2**j)
+    raz[j]=2**j
+plt.figure()
+plt.plot(raz,ass)   
+plt.plot(raz,ist,color='red')
+
+    
